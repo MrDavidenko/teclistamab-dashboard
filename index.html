@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teclistamab Behandelschema & Markers</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: system-ui, -apple-system, sans-serif; 
+            padding: 20px;
+            background: #f9fafb;
+        }
+        .container { 
+            max-width: 1000px; 
+            margin: 0 auto; 
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        h1 { text-align: center; margin-bottom: 10px; color: #111827; }
+        .subtitle { text-align: center; color: #6b7280; margin-bottom: 30px; }
+        .nav-buttons { 
+            display: flex; 
+            gap: 10px; 
+            margin-bottom: 30px; 
+            justify-content: center; 
+            flex-wrap: wrap; 
+        }
+        .nav-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        .nav-btn:hover { opacity: 0.8; }
+        .input-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #fef3c7;
+            border-radius: 8px;
+            border: 2px solid #f59e0b;
+        }
+        .preset-buttons {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #f3f4f6;
+            border-radius: 6px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .preset-btn {
+            padding: 6px 12px;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .input-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        .input-field label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .input-field input {
+            width: 100%;
+            padding: 8px;
+            border-radius: 4px;
+            border: 2px solid;
+            font-size: 16px;
+        }
+        .input-field small {
+            font-size: 12px;
+            color: #6b7280;
+        }
+        .evaluation {
+            padding: 15px;
+            background: white;
+            border-radius: 6px;
+            border: 2px solid #e5e7eb;
+        }
+        .eval-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .eval-card {
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #e5e7eb;
+        }
+        .conclusion {
+            margin-top: 15px;
+            padding: 12px;
+            border-radius: 6px;
+            border: 2px solid;
+        }
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-bottom: 20px;
+        }
+        .info-box {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Teclistamab Behandelschema & Markers</h1>
+        <p class="subtitle">💾 Je waarden worden automatisch opgeslagen in je browser</p>
+
+        <!-- Navigation -->
+        <div class="nav-buttons">
+            <button class="nav-btn" onclick="showView('dosing')" id="btn-dosing">Doseringen</button>
+            <button class="nav-btn" onclick="showView('bcells')" id="btn-bcells">B-cellen</button>
+            <button class="nav-btn" onclick="showView('igg')" id="btn-igg">IgG</button>
+            <button class="nav-btn" onclick="showView('autoab')" id="btn-autoab">Auto-Ab</button>
+        </div>
+
+        <!-- Input Section -->
+        <div class="input-section">
+            <h3 style="margin-bottom: 15px;">📊 Week 6 Resultaten</h3>
+            
+            <div class="preset-buttons">
+                <span style="font-weight: bold; font-size: 14px;">Snel invullen:</span>
+                <button class="preset-btn" style="background: #3b82f6;" onclick="setPreset('expected')">
+                    Verwacht (B:8, IgG:7, Ab:40%)
+                </button>
+                <button class="preset-btn" style="background: #22c55e;" onclick="setPreset('excellent')">
+                    Excellent (B:5, IgG:6, Ab:35%)
+                </button>
+                <button class="preset-btn" style="background: #ef4444;" onclick="setPreset('concern')">
+                    Zorgelijk (B:80, IgG:4.5, Ab:75%)
+                </button>
+            </div>
+
+            <div class="input-grid">
+                <div class="input-field">
+                    <label style="color: #8b5cf6;">B-cellen (cellen/μL)</label>
+                    <input type="number" id="bcell-input" style="border-color: #8b5cf6;" onchange="saveData(); updateCharts(); evaluate();">
+                    <small>Target: &lt;10 = excellent</small>
+                </div>
+                <div class="input-field">
+                    <label style="color: #06b6d4;">IgG (g/L)</label>
+                    <input type="number" step="0.1" id="igg-input" style="border-color: #06b6d4;" onchange="saveData(); updateCharts(); evaluate();">
+                    <small>Target: &gt;5 = veilig</small>
+                </div>
+                <div class="input-field">
+                    <label style="color: #22c55e;">Auto-Ab (% van baseline)</label>
+                    <input type="number" id="autoab-input" style="border-color: #22c55e;" onchange="saveData(); updateCharts(); evaluate();">
+                    <small>Target: &lt;50% = goed</small>
+                </div>
+            </div>
+
+            <div class="evaluation">
+                <h4 style="margin-bottom: 10px;">📋 Evaluatie:</h4>
+                <div class="eval-grid" id="eval-cards"></div>
+                <div class="conclusion" id="conclusion"></div>
+            </div>
+        </div>
+
+        <!-- Chart Views -->
+        <div id="view-dosing" class="chart-view">
+            <h2>Dosering Schema (mg)</h2>
+            <div class="chart-container">
+                <canvas id="chart-dosing"></canvas>
+            </div>
+            <div class="info-box" style="background: #f3f4f6; border-radius: 8px; padding: 15px;">
+                <p><strong>Week 0-4:</strong> Opbouw 1 → 4.6 → 12 → 22.9 → 55mg</p>
+                <p><strong>Week 5-8:</strong> 4 weken STOP</p>
+                <p><strong>Week 9:</strong> Booster 55mg, dan klaar</p>
+                <p><strong>Totaal:</strong> 150.5mg</p>
+            </div>
+        </div>
+
+        <div id="view-bcells" class="chart-view hidden">
+            <h2>B-cel Counts (CD19+)</h2>
+            <div class="chart-container">
+                <canvas id="chart-bcells"></canvas>
+            </div>
+            <div class="info-box" style="background: #f0fdf4; border: 2px solid #86efac; border-radius: 8px; padding: 15px;">
+                <p><strong>✓ Week 6:</strong> &lt;10 = diepe depletie (goed)</p>
+                <p><strong>✓ Week 13:</strong> &lt;50 = nog gedepleteerd (adequaat)</p>
+                <p><strong>✓ Week 24:</strong> Geleidelijk herstel (langzaam = goed)</p>
+            </div>
+        </div>
+
+        <div id="view-igg" class="chart-view hidden">
+            <h2>IgG Spiegels (g/L)</h2>
+            <div class="chart-container">
+                <canvas id="chart-igg"></canvas>
+            </div>
+            <div class="info-box" style="background: #ecfeff; border: 2px solid #67e8f9; border-radius: 8px; padding: 15px;">
+                <p><strong>✓ Week 6:</strong> ~7 g/L = veilig</p>
+                <p><strong>✓ Week 13:</strong> ~5 g/L = laagste punt, nog boven kritiek</p>
+                <p><strong>⚠️ Actie:</strong> IVIG alleen als &lt;4 g/L + infecties</p>
+            </div>
+        </div>
+
+        <div id="view-autoab" class="chart-view hidden">
+            <h2>Auto-antilichamen (% van baseline)</h2>
+            <div class="chart-container">
+                <canvas id="chart-autoab"></canvas>
+            </div>
+            <div class="info-box" style="background: #f0fdf4; border: 2px solid #86efac; border-radius: 8px; padding: 15px;">
+                <p><strong>🎯 Week 6:</strong> 40% (-60% reductie) = goed</p>
+                <p><strong>🎯 Week 13:</strong> 25% (-75% reductie) = excellent</p>
+                <p><strong>🎯 Week 24:</strong> Blijft laag = duurzaam succes</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data storage
+        const STORAGE_KEY = 'teclistamab_week6_data';
+        let charts = {};
+        let currentView = 'dosing';
+
+        // Load saved data
+        function loadData() {
+            const saved = localStorage.getItem(STORAGE_KEY);
+            if (saved) {
+                const data = JSON.parse(saved);
+                document.getElementById('bcell-input').value = data.bcell;
+                document.getElementById('igg-input').value = data.igg;
+                document.getElementById('autoab-input').value = data.autoab;
+            } else {
+                // Default values
+                document.getElementById('bcell-input').value = 8;
+                document.getElementById('igg-input').value = 7;
+                document.getElementById('autoab-input').value = 40;
+            }
+        }
+
+        function saveData() {
+            const data = {
+                bcell: parseFloat(document.getElementById('bcell-input').value),
+                igg: parseFloat(document.getElementById('igg-input').value),
+                autoab: parseFloat(document.getElementById('autoab-input').value)
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        }
+
+        function setPreset(type) {
+            const presets = {
+                expected: { bcell: 8, igg: 7, autoab: 40 },
+                excellent: { bcell: 5, igg: 6, autoab: 35 },
+                concern: { bcell: 80, igg: 4.5, autoab: 75 }
+            };
+            const preset = presets[type];
+            document.getElementById('bcell-input').value = preset.bcell;
+            document.getElementById('igg-input').value = preset.igg;
+            document.getElementById('autoab-input').value = preset.autoab;
+            saveData();
+            updateCharts();
+            evaluate();
+        }
+
+        function getData() {
+            return {
+                bcell: parseFloat(document.getElementById('bcell-input').value),
+                igg: parseFloat(document.getElementById('igg-input').value),
+                autoab: parseFloat(document.getElementById('autoab-input').value)
+            };
+        }
+
+        function showView(view) {
+            currentView = view;
+            document.querySelectorAll('.chart-view').forEach(v => v.classList.add('hidden'));
+            document.getElementById('view-' + view).classList.remove('hidden');
+            
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.style.backgroundColor = '#e5e7eb';
+                btn.style.color = 'black';
+            });
+            
+            const colors = {
+                dosing: '#2563eb',
+                bcells: '#8b5cf6',
+                igg: '#06b6d4',
+                autoab: '#22c55e'
+            };
+            
+            const btn = document.getElementById('btn-' + view);
+            btn.style.backgroundColor = colors[view];
+            btn.style.color = 'white';
+        }
+
+        function evaluate() {
+            const data = getData();
+            
+            const bcellStatus = data.bcell < 10 ? 'excellent' : data.bcell < 50 ? 'goed' : data.bcell < 100 ? 'matig' : 'zorgelijk';
+            const iggStatus = data.igg > 5 ? 'veilig' : data.igg > 4 ? 'monitor' : 'laag';
+            const autoAbStatus = data.autoab < 50 ? 'excellent' : data.autoab < 70 ? 'goed' : 'onvoldoende';
+            
+            const bgColors = {
+                excellent: '#dcfce7',
+                goed: '#fef3c7',
+                matig: '#fed7aa',
+                zorgelijk: '#fecaca',
+                veilig: '#dcfce7',
+                monitor: '#fef3c7',
+                laag: '#fecaca',
+                onvoldoende: '#fecaca'
+            };
+            
+            document.getElementById('eval-cards').innerHTML = `
+                <div class="eval-card" style="background: ${bgColors[bcellStatus]}">
+                    <strong>B-cellen:</strong> ${bcellStatus}<br>
+                    <small>${data.bcell < 10 ? '✓ Diepe depletie - perfect!' : 
+                            data.bcell < 50 ? '○ Acceptabel niveau' : 
+                            data.bcell < 100 ? '⚠ Matige depletie' : '✗ Te weinig effect'}</small>
+                </div>
+                <div class="eval-card" style="background: ${bgColors[iggStatus]}">
+                    <strong>IgG:</strong> ${iggStatus}<br>
+                    <small>${data.igg > 5 ? '✓ Veilig niveau' : 
+                            data.igg > 4 ? '⚠ Monitoren, IVIG standby' : '✗ Laag! IVIG overwegen'}</small>
+                </div>
+                <div class="eval-card" style="background: ${bgColors[autoAbStatus]}">
+                    <strong>Auto-Ab:</strong> ${autoAbStatus}<br>
+                    <small>${data.autoab < 50 ? `✓ ${100-data.autoab}% reductie!` : 
+                            data.autoab < 70 ? `○ ${100-data.autoab}% reductie` : '⚠ Onvoldoende'}</small>
+                </div>
+            `;
+            
+            let conclusionBg, conclusionBorder, conclusionText;
+            if (bcellStatus === 'excellent' && iggStatus === 'veilig' && autoAbStatus === 'excellent') {
+                conclusionBg = '#dcfce7';
+                conclusionBorder = '#22c55e';
+                conclusionText = '🎉 Uitstekend! Dosis adequaat. Ga door met booster.';
+            } else if (bcellStatus === 'zorgelijk' || autoAbStatus === 'onvoldoende') {
+                conclusionBg = '#fecaca';
+                conclusionBorder = '#ef4444';
+                conclusionText = '⚠️ Mogelijk onvoldoende. Overweeg hogere booster (75mg).';
+            } else if (iggStatus === 'laag') {
+                conclusionBg = '#fecaca';
+                conclusionBorder = '#ef4444';
+                conclusionText = '⚠️ IgG te laag. Booster uitstellen, IVIG overwegen.';
+            } else {
+                conclusionBg = '#fef3c7';
+                conclusionBorder = '#f59e0b';
+                conclusionText = '✓ Redelijk. Ga door met booster, monitor nauwkeurig.';
+            }
+            
+            document.getElementById('conclusion').style.backgroundColor = conclusionBg;
+            document.getElementById('conclusion').style.borderColor = conclusionBorder;
+            document.getElementById('conclusion').innerHTML = '<strong>Overall:</strong> ' + conclusionText;
+        }
+
+        function createCharts() {
+            const data = getData();
+            
+            // Dosing chart
+            charts.dosing = new Chart(document.getElementById('chart-dosing'), {
+                type: 'bar',
+                data: {
+                    labels: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+                    datasets: [{
+                        label: 'Dosis (mg)',
+                        data: [1, 4.6, 12, 22.9, 55, 0, 0, 0, 0, 55],
+                        backgroundColor: '#3b82f6'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: 'Dosis (mg)' } },
+                        x: { title: { display: true, text: 'Weken' } }
+                    }
+                }
+            });
+            
+            // B-cells chart
+            charts.bcells = new Chart(document.getElementById('chart-bcells'), {
+                type: 'line',
+                data: {
+                    labels: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '13', '16', '20', '24'],
+                    datasets: [{
+                        label: 'B-cellen (cellen/μL)',
+                        data: [200, 180, 150, 100, 50, 20, data.bcell, 12, 20, 30, 10, 15, 40, 80, 120],
+                        borderColor: '#8b5cf6',
+                        backgroundColor: 'transparent',
+                        tension: 0.4,
+                        pointRadius: 5,
+                        pointBackgroundColor: function(context) {
+                            return context.dataIndex === 6 ? '#f59e0b' : '#8b5cf6';
+                        },
+                        pointBorderColor: function(context) {
+                            return context.dataIndex === 6 ? '#fff' : '#8b5cf6';
+                        },
+                        pointBorderWidth: function(context) {
+                            return context.dataIndex === 6 ? 2 : 0;
+                        },
+                        pointRadius: function(context) {
+                            return context.dataIndex === 6 ? 8 : 5;
+                        }
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: 'Cellen/μL' } },
+                        x: { title: { display: true, text: 'Weken' } }
+                    },
+                    plugins: {
+                        annotation: {
+                            annotations: {
+                                line1: {
+                                    type: 'line',
+                                    yMin: 10,
+                                    yMax: 10,
+                                    borderColor: '#22c55e',
+                                    borderWidth: 2,
+                                    borderDash: [5, 5],
+                                    label: {
+                                        content: 'Target <10',
+                                        enabled: true
+                                    }
+                                },
+                                line2: {
+                                    type: 'line',
+                                    yMin: 50,
+                                    yMax: 50,
+                                    borderColor: '#f59e0b',
+                                    borderWidth: 2,
+                                    borderDash: [5, 5],
+                                    label: {
+                                        content: '<50',
+                                        enabled: true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // IgG chart
+            charts.igg = new Chart(document.getElementById('chart-igg'), {
+                type: 'line',
+                data: {
+                    labels: ['0', '2', '4', '6', '9', '13', '16', '20', '24'],
+                    datasets: [{
+                        label: 'IgG (g/L)',
+                        data: [10, 9.5, 8.5, data.igg, 5.5, 5, 5.5, 6.5, 7.5],
+                        borderColor: '#06b6d4',
+                        backgroundColor: 'transparent',
+                        tension: 0.4,
+                        pointBackgroundColor: function(context) {
+                            return context.dataIndex === 3 ? '#f59e0b' : '#06b6d4';
+                        },
+                        pointBorderColor: function(context) {
+                            return context.dataIndex === 3 ? '#fff' : '#06b6d4';
+                        },
+                        pointBorderWidth: function(context) {
+                            return context.dataIndex === 3 ? 2 : 0;
+                        },
+                        pointRadius: function(context) {
+                            return context.dataIndex === 3 ? 8 : 5;
+                        }
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { min: 0, max: 12, title: { display: true, text: 'IgG (g/L)' } },
+                        x: { title: { display: true, text: 'Weken' } }
+                    }
+                }
+            });
+            
+            // Auto-Ab chart
+            charts.autoab = new Chart(document.getElementById('chart-autoab'), {
+                type: 'line',
+                data: {
+                    labels: ['0', '2', '4', '6', '9', '13', '16', '20', '24'],
+                    datasets: [{
+                        label: 'Auto-Ab (% van baseline)',
+                        data: [100, 85, 60, data.autoab, 35, 25, 24, 25, 30],
+                        borderColor: '#22c55e',
+                        backgroundColor: 'transparent',
+                        tension: 0.4,
+                        pointBackgroundColor: function(context) {
+                            return context.dataIndex === 3 ? '#f59e0b' : '#22c55e';
+                        },
+                        pointBorderColor: function(context) {
+                            return context.dataIndex === 3 ? '#fff' : '#22c55e';
+                        },
+                        pointBorderWidth: function(context) {
+                            return context.dataIndex === 3 ? 2 : 0;
+                        },
+                        pointRadius: function(context) {
+                            return context.dataIndex === 3 ? 8 : 5;
+                        }
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: { min: 0, max: 110, title: { display: true, text: '% van baseline' } },
+                        x: { title: { display: true, text: 'Weken' } }
+                    }
+                }
+            });
+        }
+
+        function updateCharts() {
+            const data = getData();
+            
+            if (charts.bcells) {
+                charts.bcells.data.datasets[0].data[6] = data.bcell;
+                charts.bcells.update();
+            }
+            
+            if (charts.igg) {
+                charts.igg.data.datasets[0].data[3] = data.igg;
+                charts.igg.update();
+            }
+            
+            if (charts.autoab) {
+                charts.autoab.data.datasets[0].data[3] = data.autoab;
+                charts.autoab.update();
+            }
+        }
+
+        // Initialize
+        window.onload = function() {
+            loadData();
+            createCharts();
+            evaluate();
+            showView('dosing');
+        };
+    </script>
+</body>
+</html>
